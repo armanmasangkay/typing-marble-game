@@ -33,6 +33,10 @@ const ICE_SERVERS = [
 //   VITE_TURN_URL=turn:openrelay.metered.ca:80,turns:openrelay.metered.ca:443?transport=tcp
 //   VITE_TURN_USERNAME=openrelayproject
 //   VITE_TURN_CREDENTIAL=openrelayproject
+// Whether a TURN relay was actually inlined into this build. This is the single
+// source of truth for distinguishing "TURN not deployed" from "TURN deployed but
+// the relay candidate never gathered" — it reflects the running build, not the repo.
+let TURN_CONFIGURED = false
 if (import.meta.env.VITE_TURN_URL) {
   const urls = import.meta.env.VITE_TURN_URL.split(',')
     .map((u) => u.trim())
@@ -43,6 +47,7 @@ if (import.meta.env.VITE_TURN_URL) {
       username: import.meta.env.VITE_TURN_USERNAME,
       credential: import.meta.env.VITE_TURN_CREDENTIAL,
     })
+    TURN_CONFIGURED = true
   }
 }
 
@@ -58,6 +63,11 @@ const NET_DEBUG =
 function netLog(...args) {
   if (NET_DEBUG) console.log('[mtb-net]', ...args)
 }
+
+// Log, from the running build, whether TURN was inlined. On the live site this
+// answers "did my Vercel env vars actually reach this deployment?" without guessing:
+// enable with localStorage.mtb-netdebug = '1' and reload.
+netLog('TURN configured:', TURN_CONFIGURED, '| ICE servers:', ICE_SERVERS.length)
 
 // Pull the candidate type (host / srflx / prflx / relay) out of an SDP
 // candidate line, which looks like "candidate:... typ srflx ...".
@@ -201,6 +211,11 @@ export class NetPeer {
       pc.addEventListener('iceconnectionstatechange', () => {
         report.iceConnectionState = pc.iceConnectionState
         netLog('iceConnectionState ->', pc.iceConnectionState)
+        // Capture the full summary on failure too (not just the guest timeout),
+        // so host-side and non-timeout failures are inspectable.
+        if (pc.iceConnectionState === 'failed') {
+          netLog('ICE failed; summary:', this._iceSummary())
+        }
       })
       pc.addEventListener('icegatheringstatechange', () => {
         report.iceGatheringState = pc.iceGatheringState
@@ -219,6 +234,7 @@ export class NetPeer {
       localCandidateTypes: { ...this.iceReport.localCandidateTypes },
       gotSrflx: types.includes('srflx'),
       gotRelay: types.includes('relay'),
+      turnConfigured: TURN_CONFIGURED,
     }
   }
 

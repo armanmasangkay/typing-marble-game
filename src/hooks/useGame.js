@@ -122,7 +122,22 @@ export function useGame() {
     } else if (code === 'timeout') {
       // Log ICE diagnostics so a reproduction with devtools open reveals
       // whether this is a NAT-traversal failure (see src/net/peer.js).
-      console.warn('[mtb-net] join timed out; ICE report:', err && err.ice)
+      const ice = err && err.ice
+      console.warn('[mtb-net] join timed out; ICE report:', ice)
+      // Developer-facing hint: the relay-path story behind the timeout.
+      if (ice && ice.turnConfigured === false) {
+        console.warn(
+          '[mtb-net] No TURN relay in this build (turnConfigured=false). ' +
+          'Set VITE_TURN_* in the deploy env and redeploy — see .env.example.',
+        )
+      } else if (ice && ice.turnConfigured && !ice.gotRelay) {
+        console.warn(
+          '[mtb-net] TURN is configured but no relay candidate gathered ' +
+          '(gotRelay=false). The relay is likely unreachable — try dedicated ' +
+          'TURN credentials.',
+        )
+      }
+      // Player-facing copy stays friendly regardless of the underlying cause.
       setErrorMsg(
         "Couldn't reach your friend's game. Make sure the code is right and " +
         "they're still on the waiting screen, then try again.",
