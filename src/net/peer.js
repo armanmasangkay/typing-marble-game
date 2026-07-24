@@ -23,7 +23,42 @@ const ICE_SERVERS = [
   { urls: 'stun:stun2.l.google.com:19302' },
 ]
 
+// Optional TURN relay, enabled purely by env — no behavior change when unset.
+// TURN relays traffic through a server when direct P2P fails (strict/symmetric
+// NAT, UDP-blocking firewalls), so it's the real fix for those cross-network
+// join failures. To enable, set VITE_TURN_URL (+ username/credential) in the
+// deploy env. A free, no-signup starting point is Metered Open Relay, e.g.:
+//   VITE_TURN_URL=turn:openrelay.metered.ca:80
+//   VITE_TURN_USERNAME=openrelayproject
+//   VITE_TURN_CREDENTIAL=openrelayproject
+if (import.meta.env.VITE_TURN_URL) {
+  ICE_SERVERS.push({
+    urls: import.meta.env.VITE_TURN_URL,
+    username: import.meta.env.VITE_TURN_USERNAME,
+    credential: import.meta.env.VITE_TURN_CREDENTIAL,
+  })
+}
+
 const PEER_OPTS = { config: { iceServers: ICE_SERVERS } }
+
+// Verbose ICE logging for diagnosing connection failures. On in dev; in a
+// deployed build, turn on per-browser with localStorage.mtb-netdebug = '1'.
+const NET_DEBUG =
+  import.meta.env.DEV ||
+  (typeof localStorage !== 'undefined' &&
+    localStorage.getItem('mtb-netdebug') === '1')
+
+function netLog(...args) {
+  if (NET_DEBUG) console.log('[mtb-net]', ...args)
+}
+
+// Pull the candidate type (host / srflx / prflx / relay) out of an SDP
+// candidate line, which looks like "candidate:... typ srflx ...".
+function candidateType(candidate) {
+  if (!candidate) return 'unknown'
+  const m = /\btyp (\w+)/.exec(candidate)
+  return m ? m[1] : 'unknown'
+}
 
 // How long to wait, in ms, before giving up on a stalled connection attempt.
 const BROKER_TIMEOUT_MS = 10000 // peer never registers with the broker
@@ -50,6 +85,7 @@ export class NetPeer {
     this.roomCode = null
     this.brokerTimer = null // fires if our peer never registers with the broker
     this.connectTimer = null // fires if the data channel never opens (guest)
+    this.iceReport = null // last-seen ICE diagnostics (for failure analysis)
   }
 
   // Host: create a room and wait for a guest to connect.
@@ -102,7 +138,7 @@ export class NetPeer {
       this.conn = conn
       this._wireConn(conn)
       this.connectTimer = setTimeout(
-        () => this._handleError({ type: 'timeout' }),
+        () => this._handleError({ type: 'timeout', ice: this._iceSummary() }),
         CONNECT_TIMEOUT_MS,
       )
     })
@@ -120,6 +156,63 @@ export class NetPeer {
     conn.on('data', (data) => this.onMessage(data))
     conn.on('close', () => this.onStatus('disconnected'))
     conn.on('error', (err) => this._handleError(err))
+    this._attachIceDiagnostics(conn)
+  }
+
+  // Watch the underlying RTCPeerConnection so a failed join can be diagnosed:
+  // did we gather a server-reflexive (STUN) candidate? did ICE ever leave
+  // 'new'/'checking'? Findings are logged (when NET_DEBUG) and stashed on
+  // this.iceReport so _handleError can attach them to a timeout error.
+  _attachIceDiagnostics(conn) {
+    const report = {
+      role: this.isHost ? 'host' : 'guest',
+      localCandidateTypes: {},
+      iceConnectionState: null,
+      iceGatheringState: null,
+      remoteCandidateSeen: false,
+    }
+    this.iceReport = report
+
+    // conn.peerConnection can be null for a moment after connect(); poll briefly.
+    let tries = 0
+    const attach = () => {
+      const pc = conn.peerConnection
+      if (!pc) {
+        if (tries++ < 40) setTimeout(attach, 100) // up to ~4s
+        return
+      }
+      report.iceConnectionState = pc.iceConnectionState
+      report.iceGatheringState = pc.iceGatheringState
+
+      pc.addEventListener('icecandidate', (e) => {
+        if (!e.candidate) return
+        const type = candidateType(e.candidate.candidate)
+        report.localCandidateTypes[type] =
+          (report.localCandidateTypes[type] || 0) + 1
+        netLog('local ICE candidate:', type)
+      })
+      pc.addEventListener('iceconnectionstatechange', () => {
+        report.iceConnectionState = pc.iceConnectionState
+        netLog('iceConnectionState ->', pc.iceConnectionState)
+      })
+      pc.addEventListener('icegatheringstatechange', () => {
+        report.iceGatheringState = pc.iceGatheringState
+        netLog('iceGatheringState ->', pc.iceGatheringState)
+      })
+    }
+    attach()
+  }
+
+  // Snapshot of the ICE report for logging/attaching to an error.
+  _iceSummary() {
+    if (!this.iceReport) return null
+    const types = Object.keys(this.iceReport.localCandidateTypes)
+    return {
+      ...this.iceReport,
+      localCandidateTypes: { ...this.iceReport.localCandidateTypes },
+      gotSrflx: types.includes('srflx'),
+      gotRelay: types.includes('relay'),
+    }
   }
 
   _clearBrokerTimer() {
@@ -134,6 +227,7 @@ export class NetPeer {
     // 'peer-unavailable' means the room code was wrong / host not present.
     this._clearBrokerTimer()
     this._clearConnectTimer()
+    netLog('error:', err && err.type, 'ice:', this._iceSummary())
     this.onError(err)
     this.onStatus('error')
   }

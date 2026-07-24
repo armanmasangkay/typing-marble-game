@@ -111,6 +111,9 @@ export function useGame() {
     } else if (code === 'unavailable-id') {
       setErrorMsg('That room code is already in use. Try creating a new game.')
     } else if (code === 'timeout') {
+      // Log ICE diagnostics so a reproduction with devtools open reveals
+      // whether this is a NAT-traversal failure (see src/net/peer.js).
+      console.warn('[mtb-net] join timed out; ICE report:', err && err.ice)
       setErrorMsg(
         "Couldn't reach your friend's game. Make sure the code is right and " +
         "they're still on the waiting screen, then try again.",
