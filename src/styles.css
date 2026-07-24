@@ -276,6 +276,34 @@ body {
   92%  { transform: translateY(0) scaleY(0.96) scaleX(1.03); }
   100% { transform: translateY(0) scaleY(1) scaleX(1); opacity: 1; }
 }
+/* Row knocked out by an opponent power-up: burst pieces overlaid at the top of
+   the marble stack, each popping outward, while the whole bucket shakes. */
+.burst {
+  position: absolute;
+  top: 8px; left: 0; right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  pointer-events: none;
+}
+.marble-pop {
+  animation: pop 0.42s ease-out forwards;
+  animation-delay: calc(var(--i, 0) * 0.03s);
+}
+@keyframes pop {
+  0%   { transform: scale(1) translateY(0);   opacity: 1; }
+  40%  { transform: scale(1.6) translateY(-6px); opacity: 0.9; }
+  100% { transform: scale(0.2) translateY(-22px); opacity: 0; }
+}
+.bucket.shake { animation: shake 0.4s ease-in-out; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-6px) rotate(-1.5deg); }
+  40% { transform: translateX(6px) rotate(1.5deg); }
+  60% { transform: translateX(-4px) rotate(-1deg); }
+  80% { transform: translateX(4px) rotate(1deg); }
+}
+
 .bucket-count { margin-top: 10px; font-weight: 700; color: var(--muted); }
 
 /* ---------- Word prompt ---------- */

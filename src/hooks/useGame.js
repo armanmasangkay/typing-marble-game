@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NetPeer, generateRoomCode } from '../net/peer.js'
 import { nextWord } from '../game/words.js'
-import { playCountdown, playGo, playWin, playLose } from '../audio/sfx.js'
+import { playCountdown, playGo, playWin, playLose, playPop } from '../audio/sfx.js'
 import {
   BUCKET_CAPACITY,
   MARBLES_PER_WORD,
-  POWERUP_CLEAR,
   COUNTDOWN_SECONDS,
+  topRowCount,
 } from '../game/constants.js'
 
 // phase: 'lobby' | 'countdown' | 'playing' | 'gameover'
@@ -22,6 +22,10 @@ export function useGame() {
   const [result, setResult] = useState(null) // 'win' | 'lose'
   const [opponentLeft, setOpponentLeft] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  // Bumped each time an opponent power-up knocks a row out of YOUR bucket, so
+  // the "You" bucket can play the pop/burst animation. The count of marbles
+  // removed rides along so the burst spawns the right number of pieces.
+  const [myPop, setMyPop] = useState({ n: 0, removed: 0 })
 
   const netRef = useRef(null)
   const myBucketRef = useRef(0)
@@ -40,6 +44,7 @@ export function useGame() {
     setResult(null)
     setOpponentLeft(false)
     setWord(null)
+    setMyPop({ n: 0, removed: 0 })
     setCountdown(COUNTDOWN_SECONDS)
     setPhase('countdown')
   }, [setMyBucketBoth])
@@ -65,19 +70,18 @@ export function useGame() {
   }, [result])
 
   // --- Networking message handling ---
-  const applyIncomingMarbles = useCallback((count) => {
+  // The opponent typed a power-up word: knock our top visible row of marbles
+  // out. We're authoritative over our own count, so we compute the row size
+  // here, remove it, play the pop feedback, and echo our new total back.
+  const applyIncomingClear = useCallback(() => {
     const net = netRef.current
-    const next = myBucketRef.current + count
-    if (next >= BUCKET_CAPACITY) {
-      setMyBucketBoth(BUCKET_CAPACITY)
-      net && net.send({ type: 'state', bucket: BUCKET_CAPACITY })
-      net && net.send({ type: 'gameover' })
-      setResult('lose')
-      setPhase('gameover')
-    } else {
-      setMyBucketBoth(next)
-      net && net.send({ type: 'state', bucket: next })
-    }
+    const removed = topRowCount(myBucketRef.current)
+    if (removed <= 0) return
+    const next = myBucketRef.current - removed
+    setMyBucketBoth(next)
+    net && net.send({ type: 'state', bucket: next })
+    playPop()
+    setMyPop((p) => ({ n: p.n + 1, removed }))
   }, [setMyBucketBoth])
 
   const handleMessage = useCallback((msg) => {
@@ -86,15 +90,15 @@ export function useGame() {
       case 'start':
         beginCountdown()
         break
-      case 'marble':
-        if (phaseRef.current === 'playing') applyIncomingMarbles(msg.count || 0)
+      case 'clearRow':
+        if (phaseRef.current === 'playing') applyIncomingClear()
         break
       case 'state':
         setOppBucket(msg.bucket || 0)
         break
       case 'gameover':
-        // Opponent's bucket overflowed → we win.
-        setResult('win')
+        // Opponent filled their bucket first → we lose the race.
+        setResult('lose')
         setPhase('gameover')
         break
       case 'rematch':
@@ -103,7 +107,7 @@ export function useGame() {
       default:
         break
     }
-  }, [applyIncomingMarbles, beginCountdown])
+  }, [applyIncomingClear, beginCountdown])
 
   const handleStatus = useCallback((s) => {
     setStatus(s)
@@ -196,11 +200,20 @@ export function useGame() {
     const current = word
     if (!current || phaseRef.current !== 'playing') return
     if (current.powerup) {
-      const next = Math.max(0, myBucketRef.current - POWERUP_CLEAR)
+      // Offensive: knock a row out of the opponent's bucket. Our own bucket is
+      // unchanged; the opponent removes its top row and echoes back its total.
+      net && net.send({ type: 'clearRow' })
+    } else {
+      // Add marbles to OUR bucket. First to fill wins the race.
+      const next = Math.min(BUCKET_CAPACITY, myBucketRef.current + MARBLES_PER_WORD)
       setMyBucketBoth(next)
       net && net.send({ type: 'state', bucket: next })
-    } else {
-      net && net.send({ type: 'marble', count: MARBLES_PER_WORD })
+      if (next >= BUCKET_CAPACITY) {
+        net && net.send({ type: 'gameover' })
+        setResult('win')
+        setPhase('gameover')
+        return
+      }
     }
     setWord(nextWord())
   }, [word, setMyBucketBoth])
@@ -236,7 +249,7 @@ export function useGame() {
   return {
     phase, role, status, roomCode,
     myBucket, oppBucket, capacity: BUCKET_CAPACITY,
-    word, countdown, result, opponentLeft, errorMsg,
+    word, countdown, result, opponentLeft, errorMsg, myPop,
     createRoom, joinRoom, startGame, completeWord, requestRematch, leave,
   }
 }

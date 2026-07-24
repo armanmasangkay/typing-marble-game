@@ -6,7 +6,7 @@ export default function GameOver({ game }) {
     <div className="overlay">
       <div className={`overlay-box ${won ? 'win' : 'lose'}`}>
         <h2>{won ? '🏆 You Win!' : '💀 You Lose!'}</h2>
-        <p>{won ? 'Your opponent’s bucket overflowed.' : 'Your bucket overflowed.'}</p>
+        <p>{won ? 'You filled your bucket first!' : 'Your opponent filled their bucket first.'}</p>
         <div className="lobby-actions">
           {!opponentLeft && (
             <button className="btn primary big" onClick={requestRematch}>Rematch</button>

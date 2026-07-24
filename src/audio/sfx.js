@@ -124,6 +124,14 @@ export function playError() {
   tone({ freq: 140, type: 'sawtooth', dur: 0.1, gain: 0.08 })
 }
 
+// Your marbles get knocked out by an opponent's power-up: a bright burst of
+// noise plus a quick downward tone — a satisfying "pop".
+export function playPop() {
+  if (!guard()) return
+  noise({ dur: 0.12, gain: 0.16, freq: 1600, q: 0.8 })
+  tone({ freq: 620, type: 'triangle', dur: 0.14, gain: 0.16, glideTo: 180 })
+}
+
 // Power-up word cleared: sparkly rising arpeggio.
 export function playPowerup() {
   if (!guard()) return

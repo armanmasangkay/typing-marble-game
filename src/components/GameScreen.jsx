@@ -3,19 +3,19 @@ import WordPrompt from './WordPrompt.jsx'
 
 export default function GameScreen({ game }) {
   const {
-    myBucket, oppBucket, capacity, word, phase, completeWord, opponentLeft,
+    myBucket, oppBucket, capacity, word, phase, completeWord, opponentLeft, myPop,
   } = game
 
   return (
     <div className="panel game">
       {phase === 'playing' && (
         <p className="game-helper">
-          ⌨️ Type the words to dump marbles into your opponent's bucket — if{' '}
-          <strong>your</strong> bucket fills up first, you lose!
+          ⌨️ Type words to fill <strong>your</strong> bucket — first to fill it wins!
+          A ⚡ power-up word knocks a row of marbles out of your opponent's bucket.
         </p>
       )}
       <div className="buckets">
-        <Bucket label="You" count={myBucket} capacity={capacity} mine />
+        <Bucket label="You" count={myBucket} capacity={capacity} mine pop={myPop} />
         <div className="vs">VS</div>
         <Bucket label="Opponent" count={oppBucket} capacity={capacity} />
       </div>

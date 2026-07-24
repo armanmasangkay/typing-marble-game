@@ -21,9 +21,9 @@ export default function Lobby({ game }) {
     return (
       <div className="panel lobby">
         <p className="tagline">
-          Type words to fling marbles at your friend. Fill their bucket before they
-          fill yours. Type a <span className="pill powerup">POWER-UP</span> word to
-          clear marbles from your own bucket!
+          Type words to fill your own bucket. First to fill it wins the race! Type a{' '}
+          <span className="pill powerup">POWER-UP</span> word to knock a row of marbles
+          out of your opponent's bucket and slow them down!
         </p>
 
         <div className="lobby-actions">

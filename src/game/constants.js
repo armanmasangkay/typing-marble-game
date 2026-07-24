@@ -1,7 +1,15 @@
 // Gameplay tunables — adjust these to change game feel.
 
-export const BUCKET_CAPACITY = 30    // marbles needed to overflow (= you lose)
-export const MARBLES_PER_WORD = 1    // marbles sent to opponent per normal word
-export const POWERUP_CLEAR = 3       // marbles removed from your bucket per power-up word
+export const BUCKET_CAPACITY = 30    // marbles needed to fill your bucket = you WIN
+export const MARBLES_PER_WORD = 1    // marbles added to YOUR bucket per normal word
+export const ROW_SIZE = 6            // marbles per visual row; a power-up clears the opponent's top row
 export const POWERUP_CHANCE = 0.15   // probability a given word is a power-up word
 export const COUNTDOWN_SECONDS = 3   // 3-2-1 countdown before play begins
+
+// How many marbles sit in the top (highest) visible row for a bucket of `n`
+// marbles, given ROW_SIZE-per-row wrapping. This is what an opponent's
+// power-up knocks out. 0 for an empty bucket; a full row otherwise.
+export function topRowCount(n) {
+  if (n <= 0) return 0
+  return n % ROW_SIZE || ROW_SIZE
+}

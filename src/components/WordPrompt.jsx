@@ -43,7 +43,7 @@ export default function WordPrompt({ word, onComplete, disabled }) {
 
   return (
     <div className={`word-prompt ${word.powerup ? 'powerup' : ''}`}>
-      {word.powerup && <div className="powerup-tag">⚡ POWER-UP — clears your marbles!</div>}
+      {word.powerup && <div className="powerup-tag">⚡ POWER-UP — knock out your opponent's top row!</div>}
       <div className="word-text">{chars}</div>
       <input
         ref={inputRef}
