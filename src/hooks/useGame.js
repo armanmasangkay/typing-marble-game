@@ -110,6 +110,16 @@ export function useGame() {
       setErrorMsg('No game found with that code. Check the code and try again.')
     } else if (code === 'unavailable-id') {
       setErrorMsg('That room code is already in use. Try creating a new game.')
+    } else if (code === 'timeout') {
+      setErrorMsg(
+        "Couldn't reach your friend's game. Make sure the code is right and " +
+        "they're still on the waiting screen, then try again.",
+      )
+    } else if (code === 'broker-unreachable') {
+      setErrorMsg(
+        "Couldn't connect to the matchmaking server. Check your internet and " +
+        'try again in a moment.',
+      )
     } else {
       setErrorMsg('Connection problem. Please try again.')
     }

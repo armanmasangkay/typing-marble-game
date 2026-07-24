@@ -91,10 +91,12 @@ export default function Lobby({ game }) {
           ? '✅ Connected! Waiting for the host to start the game…'
           : status === 'error'
             ? '❌ Could not connect.'
-            : '⏳ Connecting…'}
+            : '⏳ Connecting… this can take a few seconds.'}
       </p>
       <div className="lobby-actions">
-        <button className="btn ghost" onClick={leave}>Back</button>
+        <button className="btn ghost" onClick={leave}>
+          {status === 'error' ? 'Try again' : 'Back'}
+        </button>
       </div>
       {errorMsg && <p className="error">{errorMsg}</p>}
     </div>

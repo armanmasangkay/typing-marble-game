@@ -12,6 +12,23 @@ const ID_PREFIX = 'mtb-' // marble typing battle
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no easily-confused chars
 
+// Public STUN servers help browsers discover their public address for NAT
+// traversal. Listing several gives more resilience if one is unreachable.
+// NOTE: these are STUN only — there is no TURN relay, so peers behind a strict
+// (symmetric) NAT or restrictive firewall can still fail to connect. Adding a
+// TURN server is the follow-up if cross-network joins keep failing.
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+]
+
+const PEER_OPTS = { config: { iceServers: ICE_SERVERS } }
+
+// How long to wait, in ms, before giving up on a stalled connection attempt.
+const BROKER_TIMEOUT_MS = 10000 // peer never registers with the broker
+const CONNECT_TIMEOUT_MS = 12000 // broker reached, but data channel never opens
+
 export function generateRoomCode(len = 5) {
   let code = ''
   for (let i = 0; i < len; i++) {
@@ -31,6 +48,8 @@ export class NetPeer {
     this.conn = null
     this.isHost = false
     this.roomCode = null
+    this.brokerTimer = null // fires if our peer never registers with the broker
+    this.connectTimer = null // fires if the data channel never opens (guest)
   }
 
   // Host: create a room and wait for a guest to connect.
@@ -38,9 +57,17 @@ export class NetPeer {
     this.isHost = true
     this.roomCode = roomCode
     this.onStatus('connecting')
-    this.peer = new Peer(ID_PREFIX + roomCode)
+    this.peer = new Peer(ID_PREFIX + roomCode, PEER_OPTS)
+
+    // If the broker never confirms our id, surface a clear error instead of
+    // sitting in 'connecting' forever.
+    this.brokerTimer = setTimeout(
+      () => this._handleError({ type: 'broker-unreachable' }),
+      BROKER_TIMEOUT_MS,
+    )
 
     this.peer.on('open', () => {
+      this._clearBrokerTimer()
       this.onStatus('waiting')
     })
     this.peer.on('connection', (conn) => {
@@ -59,12 +86,25 @@ export class NetPeer {
     this.isHost = false
     this.roomCode = roomCode
     this.onStatus('connecting')
-    this.peer = new Peer() // random id for the guest
+    this.peer = new Peer(undefined, PEER_OPTS) // random id for the guest
+
+    // Two separate stalls to guard against: (1) our own peer never opening
+    // (broker unreachable), and (2) the peer opening but the data channel to
+    // the host never completing (host absent, or NAT traversal failed).
+    this.brokerTimer = setTimeout(
+      () => this._handleError({ type: 'broker-unreachable' }),
+      BROKER_TIMEOUT_MS,
+    )
 
     this.peer.on('open', () => {
+      this._clearBrokerTimer()
       const conn = this.peer.connect(ID_PREFIX + roomCode, { reliable: true })
       this.conn = conn
       this._wireConn(conn)
+      this.connectTimer = setTimeout(
+        () => this._handleError({ type: 'timeout' }),
+        CONNECT_TIMEOUT_MS,
+      )
     })
     this.peer.on('error', (err) => this._handleError(err))
     this.peer.on('disconnected', () => {
@@ -73,14 +113,27 @@ export class NetPeer {
   }
 
   _wireConn(conn) {
-    conn.on('open', () => this.onStatus('connected'))
+    conn.on('open', () => {
+      this._clearConnectTimer()
+      this.onStatus('connected')
+    })
     conn.on('data', (data) => this.onMessage(data))
     conn.on('close', () => this.onStatus('disconnected'))
     conn.on('error', (err) => this._handleError(err))
   }
 
+  _clearBrokerTimer() {
+    if (this.brokerTimer) { clearTimeout(this.brokerTimer); this.brokerTimer = null }
+  }
+
+  _clearConnectTimer() {
+    if (this.connectTimer) { clearTimeout(this.connectTimer); this.connectTimer = null }
+  }
+
   _handleError(err) {
     // 'peer-unavailable' means the room code was wrong / host not present.
+    this._clearBrokerTimer()
+    this._clearConnectTimer()
     this.onError(err)
     this.onStatus('error')
   }
@@ -94,6 +147,8 @@ export class NetPeer {
   }
 
   destroy() {
+    this._clearBrokerTimer()
+    this._clearConnectTimer()
     try { this.conn && this.conn.close() } catch { /* noop */ }
     try { this.peer && this.peer.destroy() } catch { /* noop */ }
     this.conn = null
