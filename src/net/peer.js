@@ -27,16 +27,23 @@ const ICE_SERVERS = [
 // TURN relays traffic through a server when direct P2P fails (strict/symmetric
 // NAT, UDP-blocking firewalls), so it's the real fix for those cross-network
 // join failures. To enable, set VITE_TURN_URL (+ username/credential) in the
-// deploy env. A free, no-signup starting point is Metered Open Relay, e.g.:
-//   VITE_TURN_URL=turn:openrelay.metered.ca:80
+// deploy env. VITE_TURN_URL may be a comma-separated list so a plain UDP entry
+// and a TLS/443 fallback (for the strictest firewalls) share one credential.
+// A free, no-signup starting point is Metered Open Relay, e.g.:
+//   VITE_TURN_URL=turn:openrelay.metered.ca:80,turns:openrelay.metered.ca:443?transport=tcp
 //   VITE_TURN_USERNAME=openrelayproject
 //   VITE_TURN_CREDENTIAL=openrelayproject
 if (import.meta.env.VITE_TURN_URL) {
-  ICE_SERVERS.push({
-    urls: import.meta.env.VITE_TURN_URL,
-    username: import.meta.env.VITE_TURN_USERNAME,
-    credential: import.meta.env.VITE_TURN_CREDENTIAL,
-  })
+  const urls = import.meta.env.VITE_TURN_URL.split(',')
+    .map((u) => u.trim())
+    .filter(Boolean)
+  if (urls.length) {
+    ICE_SERVERS.push({
+      urls, // one credential can cover several TURN transports
+      username: import.meta.env.VITE_TURN_USERNAME,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL,
+    })
+  }
 }
 
 const PEER_OPTS = { config: { iceServers: ICE_SERVERS } }
