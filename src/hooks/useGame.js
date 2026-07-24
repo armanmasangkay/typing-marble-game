@@ -183,11 +183,38 @@ export function useGame() {
           'Set VITE_TURN_* in the deploy env and redeploy — see .env.example.',
         )
       } else if (ice && ice.turnConfigured && !ice.gotRelay) {
-        console.warn(
-          '[mtb-net] TURN is configured but no relay candidate gathered ' +
-          '(gotRelay=false). The relay is likely unreachable — try dedicated ' +
-          'TURN credentials.',
+        // Point at the specific failure instead of a generic guess. TURN
+        // errorCodes: 401/403 = credentials rejected; 701 / undefined = the
+        // relay was unreachable or timed out. STUN-only errors aren't relevant
+        // here since gotSrflx already succeeded.
+        const turnErrs = (ice.turnErrors || []).filter(
+          (e) => e.url && /^turns?:/.test(e.url),
         )
+        const authRejected = turnErrs.some(
+          (e) => e.errorCode === 401 || e.errorCode === 403,
+        )
+        if (authRejected) {
+          console.warn(
+            '[mtb-net] TURN credentials were rejected (401/403). The relay is ' +
+            'reachable but the username/credential is wrong or expired — use ' +
+            'dedicated TURN credentials.',
+            turnErrs,
+          )
+        } else if (turnErrs.length) {
+          console.warn(
+            '[mtb-net] TURN is configured but no relay candidate gathered ' +
+            '(gotRelay=false). The relay appears unreachable on this network — ' +
+            'try dedicated TURN credentials or a TLS/443 transport.',
+            turnErrs,
+          )
+        } else {
+          console.warn(
+            '[mtb-net] TURN is configured but no relay candidate gathered ' +
+            '(gotRelay=false), and no ICE candidate error was reported. The ' +
+            'relay may be silently unreachable — verify with the trickle-ICE ' +
+            'tester and consider dedicated TURN credentials.',
+          )
+        }
       }
       // Player-facing copy stays friendly regardless of the underlying cause.
       setErrorMsg(

@@ -186,7 +186,10 @@ export class NetPeer {
       localCandidateTypes: {},
       iceConnectionState: null,
       iceGatheringState: null,
-      remoteCandidateSeen: false,
+      // Gathering errors keyed by the STUN/TURN server that failed. This is the
+      // signal that explains a missing relay: TURN auth failures show up here as
+      // errorCode 401/403, and an unreachable relay as 701 / a timeout.
+      turnErrors: [],
     }
     this.iceReport = report
 
@@ -207,6 +210,21 @@ export class NetPeer {
         report.localCandidateTypes[type] =
           (report.localCandidateTypes[type] || 0) + 1
         netLog('local ICE candidate:', type)
+      })
+      // Why a candidate failed to gather. Without this we only see that a relay
+      // is *absent*, not whether the TURN server rejected our credentials
+      // (401/403) or was simply unreachable (701 / timeout). errorCode 701 for a
+      // STUN server is benign noise, so only the TURN errors are actionable.
+      pc.addEventListener('icecandidateerror', (e) => {
+        const entry = {
+          url: e.url,
+          errorCode: e.errorCode,
+          errorText: e.errorText,
+          address: e.address,
+          port: e.port,
+        }
+        report.turnErrors.push(entry)
+        netLog('ICE candidate error:', entry)
       })
       pc.addEventListener('iceconnectionstatechange', () => {
         report.iceConnectionState = pc.iceConnectionState
@@ -232,6 +250,7 @@ export class NetPeer {
     return {
       ...this.iceReport,
       localCandidateTypes: { ...this.iceReport.localCandidateTypes },
+      turnErrors: [...(this.iceReport.turnErrors || [])],
       gotSrflx: types.includes('srflx'),
       gotRelay: types.includes('relay'),
       turnConfigured: TURN_CONFIGURED,
