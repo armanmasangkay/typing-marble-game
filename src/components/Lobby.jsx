@@ -1,10 +1,15 @@
 import { useState } from 'react'
+import { BOT_DIFFICULTY } from '../game/constants.js'
 
 export default function Lobby({ game }) {
   const [joinCode, setJoinCode] = useState('')
   const [copied, setCopied] = useState(false)
+  const [showBot, setShowBot] = useState(false)
 
-  const { role, status, roomCode, errorMsg, createRoom, joinRoom, startGame, leave } = game
+  const {
+    role, status, roomCode, errorMsg,
+    createRoom, joinRoom, startGame, startBotGame, leave,
+  } = game
 
   const copyCode = async () => {
     try {
@@ -46,6 +51,29 @@ export default function Lobby({ game }) {
               Join Game
             </button>
           </div>
+
+          <div className="divider"><span>or</span></div>
+
+          {!showBot ? (
+            <button className="btn" onClick={() => setShowBot(true)}>
+              🤖 Play vs Bot
+            </button>
+          ) : (
+            <div className="bot-picker">
+              <p className="bot-picker-label">Choose a difficulty:</p>
+              <div className="difficulty-row">
+                {Object.entries(BOT_DIFFICULTY).map(([key, { label }]) => (
+                  <button
+                    key={key}
+                    className="btn"
+                    onClick={() => startBotGame(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {errorMsg && <p className="error">{errorMsg}</p>}

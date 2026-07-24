@@ -3,8 +3,9 @@ import WordPrompt from './WordPrompt.jsx'
 
 export default function GameScreen({ game }) {
   const {
-    myBucket, oppBucket, capacity, word, phase, completeWord, opponentLeft, myPop,
+    myBucket, oppBucket, capacity, word, phase, completeWord, opponentLeft, myPop, role,
   } = game
+  const oppLabel = role === 'solo' ? 'Bot' : 'Opponent'
 
   return (
     <div className="panel game">
@@ -17,7 +18,7 @@ export default function GameScreen({ game }) {
       <div className="buckets">
         <Bucket label="You" count={myBucket} capacity={capacity} mine pop={myPop} />
         <div className="vs">VS</div>
-        <Bucket label="Opponent" count={oppBucket} capacity={capacity} />
+        <Bucket label={oppLabel} count={oppBucket} capacity={capacity} />
       </div>
 
       {phase === 'playing' && (

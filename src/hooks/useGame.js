@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NetPeer, generateRoomCode } from '../net/peer.js'
+import { BotNet } from '../net/botNet.js'
 import { nextWord } from '../game/words.js'
 import { playCountdown, playGo, playWin, playLose, playPop } from '../audio/sfx.js'
 import {
@@ -166,6 +167,17 @@ export function useGame() {
     return net
   }, [handleStatus, handleMessage, handleError])
 
+  const makeBotNet = useCallback((difficulty) => {
+    const net = new BotNet({
+      onStatus: handleStatus,
+      onMessage: handleMessage,
+      onError: handleError,
+      difficulty,
+    })
+    netRef.current = net
+    return net
+  }, [handleStatus, handleMessage, handleError])
+
   // --- Public actions ---
   const createRoom = useCallback(() => {
     setErrorMsg('')
@@ -193,6 +205,17 @@ export function useGame() {
     net.send({ type: 'start' })
     beginCountdown()
   }, [beginCountdown])
+
+  // Single-player: spin up a bot opponent and start immediately — no room code,
+  // no peer to wait for.
+  const startBotGame = useCallback((difficulty) => {
+    setErrorMsg('')
+    setRole('solo')
+    setRoomCode('')
+    const net = makeBotNet(difficulty)
+    net.send({ type: 'start' })
+    beginCountdown()
+  }, [makeBotNet, beginCountdown])
 
   // Called when the player finishes typing the current word.
   const completeWord = useCallback(() => {
@@ -250,6 +273,6 @@ export function useGame() {
     phase, role, status, roomCode,
     myBucket, oppBucket, capacity: BUCKET_CAPACITY,
     word, countdown, result, opponentLeft, errorMsg, myPop,
-    createRoom, joinRoom, startGame, completeWord, requestRematch, leave,
+    createRoom, joinRoom, startGame, startBotGame, completeWord, requestRematch, leave,
   }
 }

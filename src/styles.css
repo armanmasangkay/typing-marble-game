@@ -115,6 +115,9 @@ body {
   color: var(--muted);
 }
 .join-row { display: flex; gap: 10px; }
+.bot-picker { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.bot-picker-label { margin: 0; color: var(--muted); }
+.difficulty-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .code-input {
   text-transform: uppercase;
   letter-spacing: 3px;
@@ -240,6 +243,15 @@ body {
 }
 .bucket.danger .bucket-fill {
   background: linear-gradient(180deg, rgba(255, 84, 112, 0.2), rgba(255, 84, 112, 0.45)) !important;
+}
+/* Your bucket almost full = you're about to WIN → green, not a warning.
+   The opponent's near-full bucket keeps the red rules above as a real warning. */
+.bucket-col.mine .bucket.danger {
+  border-color: var(--good) !important;
+  box-shadow: 0 0 28px rgba(70, 209, 138, 0.5) !important;
+}
+.bucket-col.mine .bucket.danger .bucket-fill {
+  background: linear-gradient(180deg, rgba(70, 209, 138, 0.2), rgba(70, 209, 138, 0.45)) !important;
 }
 .marbles {
   position: relative;
