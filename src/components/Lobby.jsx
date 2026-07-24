@@ -7,17 +7,17 @@ export default function Lobby({ game }) {
   const [showBot, setShowBot] = useState(false)
 
   const {
-    role, status, roomCode, errorMsg,
+    role, status, roomCode, roomLink, errorMsg,
     createRoom, joinRoom, startGame, startBotGame, leave,
   } = game
 
-  const copyCode = async () => {
+  const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(roomCode)
+      await navigator.clipboard.writeText(roomLink || roomCode)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      /* clipboard may be blocked; user can read the code manually */
+      /* clipboard may be blocked; user can select the link manually */
     }
   }
 
@@ -85,16 +85,17 @@ export default function Lobby({ game }) {
   if (role === 'host') {
     return (
       <div className="panel lobby">
-        <h2>Your room code</h2>
-        <div className="room-code" onClick={copyCode} title="Click to copy">
-          {roomCode}
-          <span className="copy-hint">{copied ? '✓ copied' : 'click to copy'}</span>
+        <h2>Invite a friend</h2>
+        <div className="room-code" onClick={copyLink} title="Click to copy the link">
+          {roomLink || roomCode}
+          <span className="copy-hint">{copied ? '✓ copied' : 'click to copy link'}</span>
         </div>
         <p className="status-line">
-          Share this code with your friend. {status === 'connected'
+          Send this link — they just click it to join. {status === 'connected'
             ? '✅ Friend connected!'
             : '⏳ Waiting for them to join…'}
         </p>
+        <p className="code-fallback">Or share the code: <strong>{roomCode}</strong></p>
         <div className="lobby-actions">
           <button
             className="btn primary big"

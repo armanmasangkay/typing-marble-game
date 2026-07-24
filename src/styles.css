@@ -141,17 +141,18 @@ body {
 .pill.powerup { background: var(--powerup); color: #1a1300; }
 
 .room-code {
-  font-size: 2.6rem;
-  font-weight: 800;
-  letter-spacing: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   background: #11142b;
   border: 2px dashed rgba(255, 255, 255, 0.2);
   border-radius: 14px;
   padding: 18px;
   margin: 12px auto 8px;
-  max-width: 360px;
+  max-width: 420px;
   cursor: pointer;
   position: relative;
+  word-break: break-all;
 }
 .copy-hint {
   display: block;
@@ -160,7 +161,9 @@ body {
   color: var(--muted);
   margin-top: 6px;
 }
-.status-line { color: var(--muted); margin: 8px 0 20px; }
+.status-line { color: var(--muted); margin: 8px 0 12px; }
+.code-fallback { color: var(--muted); font-size: 0.85rem; margin: 0 0 20px; }
+.code-fallback strong { color: var(--text, #fff); letter-spacing: 2px; }
 .error { color: var(--bad); margin-top: 16px; font-weight: 600; }
 
 /* ---------- Countdown ---------- */

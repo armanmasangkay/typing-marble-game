@@ -31,6 +31,7 @@ export function useGame() {
   const netRef = useRef(null)
   const myBucketRef = useRef(0)
   const phaseRef = useRef('lobby')
+  const autoJoinedRef = useRef(false)
 
   useEffect(() => { phaseRef.current = phase }, [phase])
 
@@ -182,6 +183,9 @@ export function useGame() {
   const createRoom = useCallback(() => {
     setErrorMsg('')
     const code = generateRoomCode()
+    // Mark auto-join as handled so writing the code into our own URL below can't
+    // later make the host try to join its own room.
+    autoJoinedRef.current = true
     setRole('host')
     setRoomCode(code)
     makeNet().host(code)
@@ -251,6 +255,11 @@ export function useGame() {
     const net = netRef.current
     net && net.destroy()
     netRef.current = null
+    // Drop any join code from the URL so a refresh or "Back" doesn't re-trigger
+    // auto-join into the room we just left.
+    if (typeof window !== 'undefined' && window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
     setPhase('lobby')
     setRole(null)
     setStatus('idle')
@@ -269,8 +278,25 @@ export function useGame() {
     net && net.destroy()
   }, [])
 
+  // If the app was opened via a share link (e.g. /#ABCDE), pull the code out of
+  // the hash and join automatically — the friend clicks the link and lands
+  // straight on the guest "Connecting…" screen with no code to type. Runs once.
+  useEffect(() => {
+    if (autoJoinedRef.current) return
+    autoJoinedRef.current = true
+    if (typeof window === 'undefined') return
+    const code = window.location.hash.replace(/^#/, '').trim()
+    if (code) joinRoom(code)
+  }, [joinRoom])
+
+  // Full shareable URL for the current room (host side). Empty until a room
+  // code exists.
+  const roomLink = roomCode && typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}#${roomCode}`
+    : ''
+
   return {
-    phase, role, status, roomCode,
+    phase, role, status, roomCode, roomLink,
     myBucket, oppBucket, capacity: BUCKET_CAPACITY,
     word, countdown, result, opponentLeft, errorMsg, myPop,
     createRoom, joinRoom, startGame, startBotGame, completeWord, requestRematch, leave,
