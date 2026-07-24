@@ -23,6 +23,10 @@ export function useGame() {
   const [result, setResult] = useState(null) // 'win' | 'lose'
   const [opponentLeft, setOpponentLeft] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  // Rematch is mutual: a new match only begins once BOTH players have opted in.
+  // myRematch = this client asked; oppRematch = the opponent asked.
+  const [myRematch, setMyRematch] = useState(false)
+  const [oppRematch, setOppRematch] = useState(false)
   // Bumped each time an opponent power-up knocks a row out of YOUR bucket, so
   // the "You" bucket can play the pop/burst animation. The count of marbles
   // removed rides along so the burst spawns the right number of pieces.
@@ -31,9 +35,25 @@ export function useGame() {
   const netRef = useRef(null)
   const myBucketRef = useRef(0)
   const phaseRef = useRef('lobby')
+  const roleRef = useRef(null)
   const autoJoinedRef = useRef(false)
+  // Mirror the rematch opt-ins into refs so async message handlers read the
+  // current values without stale closures (same pattern as phaseRef above).
+  const myRematchRef = useRef(false)
+  const oppRematchRef = useRef(false)
 
   useEffect(() => { phaseRef.current = phase }, [phase])
+  useEffect(() => { roleRef.current = role }, [role])
+
+  const setMyRematchBoth = useCallback((v) => {
+    myRematchRef.current = v
+    setMyRematch(v)
+  }, [])
+
+  const setOppRematchBoth = useCallback((v) => {
+    oppRematchRef.current = v
+    setOppRematch(v)
+  }, [])
 
   const setMyBucketBoth = useCallback((n) => {
     myBucketRef.current = n
@@ -45,11 +65,25 @@ export function useGame() {
     setOppBucket(0)
     setResult(null)
     setOpponentLeft(false)
+    setMyRematchBoth(false)
+    setOppRematchBoth(false)
     setWord(null)
     setMyPop({ n: 0, removed: 0 })
     setCountdown(COUNTDOWN_SECONDS)
     setPhase('countdown')
-  }, [setMyBucketBoth])
+  }, [setMyBucketBoth, setMyRematchBoth, setOppRematchBoth])
+
+  // Both players have opted into a rematch — start a fresh match. The HOST is
+  // authoritative: it broadcasts the go-signal and starts locally, so both sides
+  // begin from one message and can't race into two countdowns. The guest waits
+  // for the incoming 'rematchStart' instead.
+  const maybeStartRematch = useCallback(() => {
+    if (!(myRematchRef.current && oppRematchRef.current)) return
+    if (roleRef.current !== 'host') return
+    const net = netRef.current
+    net && net.send({ type: 'rematchStart' })
+    beginCountdown()
+  }, [beginCountdown])
 
   // Drive the 3-2-1 countdown, then start play.
   useEffect(() => {
@@ -104,12 +138,24 @@ export function useGame() {
         setPhase('gameover')
         break
       case 'rematch':
-        if (phaseRef.current === 'gameover') beginCountdown()
+        // Opponent wants a rematch. Record their opt-in; only actually start
+        // once we've opted in too (host fires the go-signal in maybeStartRematch).
+        if (phaseRef.current === 'gameover') {
+          setOppRematchBoth(true)
+          maybeStartRematch()
+        }
+        break
+      case 'rematchCancel':
+        setOppRematchBoth(false)
+        break
+      case 'rematchStart':
+        // Host confirmed both sides are in — guest starts the new match.
+        beginCountdown()
         break
       default:
         break
     }
-  }, [applyIncomingClear, beginCountdown])
+  }, [applyIncomingClear, beginCountdown, maybeStartRematch, setOppRematchBoth])
 
   const handleStatus = useCallback((s) => {
     setStatus(s)
@@ -245,11 +291,27 @@ export function useGame() {
     setWord(nextWord())
   }, [word, setMyBucketBoth])
 
+  // Also serves as the "accept" action when the opponent already asked.
   const requestRematch = useCallback(() => {
     const net = netRef.current
+    // Single-player: the bot can't agree, so keep the instant restart.
+    if (roleRef.current === 'solo') {
+      net && net.send({ type: 'rematch' })
+      beginCountdown()
+      return
+    }
+    // Multiplayer: opt in and tell the opponent. The match only begins once both
+    // sides have opted in (checked here in case they already did).
+    setMyRematchBoth(true)
     net && net.send({ type: 'rematch' })
-    beginCountdown()
-  }, [beginCountdown])
+    maybeStartRematch()
+  }, [beginCountdown, maybeStartRematch, setMyRematchBoth])
+
+  const cancelRematch = useCallback(() => {
+    const net = netRef.current
+    setMyRematchBoth(false)
+    net && net.send({ type: 'rematchCancel' })
+  }, [setMyRematchBoth])
 
   const leave = useCallback(() => {
     const net = netRef.current
@@ -269,8 +331,10 @@ export function useGame() {
     setWord(null)
     setResult(null)
     setOpponentLeft(false)
+    setMyRematchBoth(false)
+    setOppRematchBoth(false)
     setErrorMsg('')
-  }, [setMyBucketBoth])
+  }, [setMyBucketBoth, setMyRematchBoth, setOppRematchBoth])
 
   // Clean up the peer connection on unmount.
   useEffect(() => () => {
@@ -299,6 +363,8 @@ export function useGame() {
     phase, role, status, roomCode, roomLink,
     myBucket, oppBucket, capacity: BUCKET_CAPACITY,
     word, countdown, result, opponentLeft, errorMsg, myPop,
-    createRoom, joinRoom, startGame, startBotGame, completeWord, requestRematch, leave,
+    myRematch, oppRematch,
+    createRoom, joinRoom, startGame, startBotGame, completeWord,
+    requestRematch, cancelRematch, leave,
   }
 }

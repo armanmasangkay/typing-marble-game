@@ -1,5 +1,8 @@
 export default function GameOver({ game }) {
-  const { result, requestRematch, leave, opponentLeft } = game
+  const {
+    result, requestRematch, cancelRematch, leave,
+    opponentLeft, myRematch, oppRematch,
+  } = game
   const won = result === 'win'
 
   return (
@@ -9,7 +12,20 @@ export default function GameOver({ game }) {
         <p>{won ? 'You filled your bucket first!' : 'Your opponent filled their bucket first.'}</p>
         <div className="lobby-actions">
           {!opponentLeft && (
-            <button className="btn primary big" onClick={requestRematch}>Rematch</button>
+            myRematch ? (
+              // We've asked and are waiting for the opponent to agree.
+              <>
+                <button className="btn primary big" disabled>Waiting for opponent…</button>
+                <button className="btn ghost" onClick={cancelRematch}>Cancel</button>
+              </>
+            ) : oppRematch ? (
+              // Opponent asked first — this button accepts.
+              <button className="btn primary big" onClick={requestRematch}>
+                Opponent wants a rematch — Accept
+              </button>
+            ) : (
+              <button className="btn primary big" onClick={requestRematch}>Rematch</button>
+            )
           )}
           <button className="btn ghost" onClick={leave}>Back to menu</button>
         </div>
