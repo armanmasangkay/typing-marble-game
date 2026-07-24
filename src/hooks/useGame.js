@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NetPeer, generateRoomCode } from '../net/peer.js'
 import { nextWord } from '../game/words.js'
+import { playCountdown, playGo, playWin, playLose } from '../audio/sfx.js'
 import {
   BUCKET_CAPACITY,
   MARBLES_PER_WORD,
@@ -47,13 +48,21 @@ export function useGame() {
   useEffect(() => {
     if (phase !== 'countdown') return undefined
     if (countdown <= 0) {
+      playGo()
       setWord(nextWord())
       setPhase('playing')
       return undefined
     }
+    playCountdown()
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000)
     return () => clearTimeout(t)
   }, [phase, countdown])
+
+  // Win/lose chimes whenever a result is decided.
+  useEffect(() => {
+    if (result === 'win') playWin()
+    else if (result === 'lose') playLose()
+  }, [result])
 
   // --- Networking message handling ---
   const applyIncomingMarbles = useCallback((count) => {

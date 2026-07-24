@@ -29,12 +29,30 @@ body {
   padding: 24px 16px 48px;
 }
 
+.app-header {
+  position: relative;
+}
 .app-header h1 {
   text-align: center;
   font-size: 2rem;
   margin: 8px 0 24px;
   letter-spacing: 0.5px;
 }
+.mute-btn {
+  position: absolute;
+  top: 6px;
+  right: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.mute-btn:hover { background: rgba(255, 255, 255, 0.12); }
 
 .panel {
   background: var(--panel);
@@ -159,6 +177,15 @@ body {
 
 /* ---------- Game ---------- */
 .game { position: relative; }
+.game-helper {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  max-width: 520px;
+  margin: 0 auto 22px;
+}
+.game-helper strong { color: var(--bad); }
 .buckets {
   display: flex;
   align-items: flex-end;
@@ -171,6 +198,7 @@ body {
 .bucket-label { font-weight: 700; margin-bottom: 8px; }
 .bucket-col.mine .bucket-label { color: var(--accent); }
 .bucket-col.opp .bucket-label { color: var(--accent-2); }
+.side-badge { margin-right: 4px; }
 
 .bucket {
   position: relative;
@@ -184,16 +212,34 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
-.bucket.danger { border-color: var(--danger); box-shadow: 0 0 24px rgba(255, 84, 112, 0.4); }
+/* Whole-container identity so you can tell the sides apart at a glance,
+   even when empty. Blue = you, purple = opponent. */
+.bucket-col.mine .bucket {
+  border-color: rgba(108, 140, 255, 0.55);
+  background: rgba(108, 140, 255, 0.05);
+  box-shadow: 0 0 22px rgba(108, 140, 255, 0.22), inset 0 0 20px rgba(108, 140, 255, 0.08);
+}
+.bucket-col.opp .bucket {
+  border-color: rgba(160, 108, 255, 0.55);
+  background: rgba(160, 108, 255, 0.05);
+  box-shadow: 0 0 22px rgba(160, 108, 255, 0.22), inset 0 0 20px rgba(160, 108, 255, 0.08);
+}
+.bucket.danger { border-color: var(--danger) !important; box-shadow: 0 0 28px rgba(255, 84, 112, 0.5) !important; }
 .bucket-fill {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  background: linear-gradient(180deg, rgba(108, 140, 255, 0.15), rgba(108, 140, 255, 0.35));
   transition: height 0.25s ease;
 }
+.bucket-col.mine .bucket-fill {
+  background: linear-gradient(180deg, rgba(108, 140, 255, 0.18), rgba(108, 140, 255, 0.4));
+}
+.bucket-col.opp .bucket-fill {
+  background: linear-gradient(180deg, rgba(160, 108, 255, 0.18), rgba(160, 108, 255, 0.42));
+}
 .bucket.danger .bucket-fill {
-  background: linear-gradient(180deg, rgba(255, 84, 112, 0.2), rgba(255, 84, 112, 0.45));
+  background: linear-gradient(180deg, rgba(255, 84, 112, 0.2), rgba(255, 84, 112, 0.45)) !important;
 }
 .marbles {
   position: relative;
@@ -209,16 +255,26 @@ body {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #b9c8ff, var(--marble) 60%, #3550c8);
-  box-shadow: inset -2px -2px 4px rgba(0, 0, 0, 0.35);
-  animation: drop 0.3s ease;
+  /* Brighter core + defined dark rim so blue vs purple reads clearly at 20px. */
+  background: radial-gradient(circle at 32% 28%, #e8eeff 0%, #93aaff 38%, var(--marble) 62%, #2138a8 100%);
+  box-shadow: inset -3px -3px 5px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  /* Gravity-eased fall, then a squash-and-settle bounce. Slight per-marble
+     delay via --i so a batch doesn't land in perfect unison. */
+  animation: drop 0.42s cubic-bezier(0.5, 0, 0.75, 0.2) backwards;
+  animation-delay: calc(var(--i, 0) * 0.015s);
+  transform-origin: bottom center;
 }
 .bucket-col.opp .marble {
-  background: radial-gradient(circle at 30% 30%, #d5b9ff, var(--accent-2) 60%, #6a35c8);
+  background: radial-gradient(circle at 32% 28%, #f3e8ff 0%, #c79bff 38%, var(--accent-2) 62%, #5a1fb0 100%);
+  box-shadow: inset -3px -3px 5px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 @keyframes drop {
-  0% { transform: translateY(-30px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
+  0%   { transform: translateY(-60px) scaleY(1);    opacity: 0; }
+  55%  { opacity: 1; }
+  70%  { transform: translateY(0) scaleY(0.72) scaleX(1.15); } /* impact squash */
+  82%  { transform: translateY(-6px) scaleY(1.08) scaleX(0.94); } /* rebound */
+  92%  { transform: translateY(0) scaleY(0.96) scaleX(1.03); }
+  100% { transform: translateY(0) scaleY(1) scaleX(1); opacity: 1; }
 }
 .bucket-count { margin-top: 10px; font-weight: 700; color: var(--muted); }
 

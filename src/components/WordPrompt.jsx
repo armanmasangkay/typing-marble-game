@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { playType, playError, playPowerup, unlockAudio } from '../audio/sfx.js'
 
 export default function WordPrompt({ word, onComplete, disabled }) {
   const [value, setValue] = useState('')
@@ -14,12 +15,20 @@ export default function WordPrompt({ word, onComplete, disabled }) {
 
   const handleChange = (e) => {
     const raw = e.target.value
+    unlockAudio() // typing is a user gesture — safe place to unlock audio
     // Space (or trailing space) submits the word; also auto-submit on exact match.
     const candidate = raw.endsWith(' ') ? raw.trim() : raw
     if (candidate === word.text) {
       setValue('')
+      if (word.powerup) playPowerup()
       onComplete()
       return
+    }
+    // Feedback on the newest typed character (ignore deletions).
+    if (raw.length > value.length) {
+      const idx = raw.length - 1
+      if (raw[idx] === word.text[idx]) playType()
+      else playError()
     }
     setValue(raw)
   }

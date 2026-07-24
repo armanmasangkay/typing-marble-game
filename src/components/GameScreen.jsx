@@ -8,6 +8,12 @@ export default function GameScreen({ game }) {
 
   return (
     <div className="panel game">
+      {phase === 'playing' && (
+        <p className="game-helper">
+          ⌨️ Type the words to dump marbles into your opponent's bucket — if{' '}
+          <strong>your</strong> bucket fills up first, you lose!
+        </p>
+      )}
       <div className="buckets">
         <Bucket label="You" count={myBucket} capacity={capacity} mine />
         <div className="vs">VS</div>
